@@ -35,7 +35,7 @@
 machineType="cloud-machine-templates/small-machine"
 machineLocations="fra05"
 faultyMachineLocations="sjc04 osa23 ams03 syd05 lon06 wdc07 che01 tok05 par01 dal10 fra05 mil01 mex01 tor01 tor04 seo01"
-
+  
 # number of client instances per node for 1/16/32 client machines
 clients1=""    # deploys 1 client machine which run the specified number of client instances
 clients16="8"    # deploys 16 client machine which run the specified number of client instances
@@ -91,7 +91,7 @@ leaderPolicies="Simple"  # Possible values:
                          #     "Blacklist": faulty nodes are blacklisted, at least 2f+1 nodes in the leaderset
                          #     "Backoff": faulty nodes are temporarily blacklisted and their penalty exponentially increases if after reinclusion to the leaderset they are faulty again.
 leaderPolicyWithFaults="SimulatedRandomFailures"
-crashTimings="ByzantineStraggler" # Possible values:
+crashTimings="Straggler" # Possible values:
                           #     "EpochStart": The faulty nodes stop participating at the protocol at the beginning of the first epoch
                           #     "EpochEnd": The faulty nodes stop participating at the protocol before proposing their last batch
                           #     "Straggler": The faulty nodes, if in the leaderset, delay proposing their batches for 0.5*viewChangeTimeouts. Works only with Pbft orderer.
@@ -101,7 +101,7 @@ singleLeaderEpoch=$minEpochLength
 
 # Parameters to tune:
 batchsizes="4096"           # [requests]
-batchrates="16"             # [batches/s]
+batchrates="32"             # [batches/s]
 # minBatchTimeout=$(($systemSizes * 1000 / $batchrates))  # [ms]
 minBatchTimeout="125"       # [ms]
 maxBatchTimeout="16000"     # [ms]
