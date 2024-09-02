@@ -91,7 +91,7 @@ leaderPolicies="Simple"  # Possible values:
                          #     "Blacklist": faulty nodes are blacklisted, at least 2f+1 nodes in the leaderset
                          #     "Backoff": faulty nodes are temporarily blacklisted and their penalty exponentially increases if after reinclusion to the leaderset they are faulty again.
 leaderPolicyWithFaults="SimulatedRandomFailures"
-crashTimings="ByzantineStraggler" # Possible values:
+crashTimings="Straggler" # Possible values:
                           #     "EpochStart": The faulty nodes stop participating at the protocol at the beginning of the first epoch
                           #     "EpochEnd": The faulty nodes stop participating at the protocol before proposing their last batch
                           #     "Straggler": The faulty nodes, if in the leaderset, delay proposing their batches for 0.5*viewChangeTimeouts. Works only with Pbft orderer.
@@ -122,12 +122,12 @@ function skip() {
 
 throughputsAuthPbft=$()
 # throughputsAuthPbft[4]="105000 110000 115000 120000"
-throughputsAuthPbft[4]="60000 70000 80000 90000 100000"
-throughputsAuthPbft[8]="60000 70000 80000"
-throughputsAuthPbft[16]="80000 90000"
-throughputsAuthPbft[32]="90000 100000 110000 120000"
-throughputsAuthPbft[64]="90000 100000 110000 120000"
-throughputsAuthPbft[128]=""
+throughputsAuthPbft[4]="30000 40000 50000 60000 70000"
+throughputsAuthPbft[8]="30000 40000 50000 60000 70000"
+throughputsAuthPbft[16]="30000 40000 50000 60000 70000"
+throughputsAuthPbft[32]="30000 40000 50000 60000 70000"
+throughputsAuthPbft[64]="30000 40000 50000 60000 70000"
+throughputsAuthPbft[128]="30000 40000 50000 60000 70000"
 throughputsNoAuthPbft=$()
 throughputsNoAuthPbft[4]="256"
 throughputsNoAuthPbft[8]="256"

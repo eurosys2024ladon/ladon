@@ -42,12 +42,13 @@ clients16=""    # deploys 16 client machine which run the specified number of cl
 clients32=""    # deploys 32 client machine which run the specified number of client instances
 systemSizes="4" # Must be sorted in ascending order!
 failureCounts=(0) # For each system size, the corresponding failure count (on top of the correct nodes)
-fixBatchRate=true
 networkInterface="lo"
 
-StragglerCnt=(0) # Count of Straggler (Only effect when crashTimings is 'Straggler')
-privKeyNumEachPeer=(10) # Using as buffer for lagged instance
+
+StragglerCnt=(1) # Count of Straggler (Only effect when crashTimings is 'Straggler')
+privKeyNumEachPeer=(5) # Using as buffer for lagged instance
 UseSig=(false)
+fixBatchRate=true
 
 
 reuseFaulty=true  # If true, both correct and faulty peers will have the same tag and will be launched together, with the same config file.
@@ -56,7 +57,7 @@ reuseFaulty=true  # If true, both correct and faulty peers will have the same ta
                   # the RandomSeed field).
 
 # Low-level system parameters
-loggingLevel="info"
+loggingLevel="debug"
 peerTag="peers"
 faultyPeerTag="faultyPeers"
 minConcurrentRequests=$((256 * 16384)) # Based on empirical data. At saturation, makes the throughput-latency plot nicely go up (as it is equivalent to may concurrent clients).
@@ -81,7 +82,7 @@ fixedEpochLength=false
 auths="true"
 bucketsPerLeader="16"
 minBuckets="16"
-minEpochLength=$(($systemSizes * 32))       # [entries]
+minEpochLength="128"       # [entries]
 nodeConnections="1"
 minConnections="16"
 leaderPolicies="Simple"  # Possible values:
@@ -100,11 +101,11 @@ singleLeaderEpoch=$minEpochLength
 
 # Parameters to tune:
 batchsizes="4096"           # [requests]
-batchrates="32"             # [batches/s]
+batchrates="8"             # [batches/s]
 # minBatchTimeout=$(($systemSizes * 1000 / $batchrates))  # [ms]
-minBatchTimeout="250"       # [ms]
-maxBatchTimeout="16000"     # [ms]
-segmentLengths="32"         # [entries]
+minBatchTimeout="500"  # [ms]
+maxBatchTimeout="4000"      # [ms]
+segmentLengths="16"         # [entries]
 viewChangeTimeouts="60000"  # [ms]
 nodeToLeaderRatios="1"      # How many nodes are initally leaders, set to 1 to have initially all nodes in the leaderset
 
@@ -120,10 +121,10 @@ function skip() {
 }
 
 throughputsAuthPbft=$()
-# throughputsAuthPbft[4]="105000 110000 115000 120000"
+# throughputsAuthPbft[4]="128 256 512 1024 2048 4096 8192 12288"
 throughputsAuthPbft[4]="1024"
-throughputsAuthPbft[8]=""
-throughputsAuthPbft[16]=""
+throughputsAuthPbft[8]="128 256 512 1024 2048 4096"
+throughputsAuthPbft[16]="128 256 512 1024 2048 4096"
 throughputsAuthPbft[32]=""
 throughputsAuthPbft[64]=""
 throughputsAuthPbft[128]=""
@@ -150,14 +151,14 @@ throughputsNoAuthSinglePbft[64]=""
 throughputsNoAuthSinglePbft[128]=""
 
 throughputsAuthHotStuff=$()
-throughputsAuthHotStuff[4]="128"
+throughputsAuthHotStuff[4]="1024 2048"
 throughputsAuthHotStuff[8]=""
 throughputsAuthHotStuff[16]=""
 throughputsAuthHotStuff[32]=""
 throughputsAuthHotStuff[64]=""
 throughputsAuthHotStuff[128]=""
 throughputsNoAuthHotStuff=$()
-throughputsNoAuthHotStuff[4]="128"
+throughputsNoAuthHotStuff[4]="1024 2048"
 throughputsNoAuthHotStuff[8]=""
 throughputsNoAuthHotStuff[16]=""
 throughputsNoAuthHotStuff[32]=""
@@ -416,9 +417,9 @@ function generateCombinations() {
                                                 segmentLength=0
                                               fi
 
-                                              if [ $numFailures -gt 0 ]; then
-                                                leaderPolicy="$leaderPolicyWithFaults"
-                                              fi
+                                              # if [ $numFailures -gt 0 ]; then
+                                              #   leaderPolicy="$leaderPolicyWithFaults"
+                                              # fi
 
                                               if [ $leaderPolicy = "Single" ]; then
                                                 segmentLength=$singleLeaderEpoch

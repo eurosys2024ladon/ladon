@@ -40,12 +40,12 @@ faultyMachineLocations="sjc04 osa23 ams03 syd05 lon06 wdc07 che01 tok05 par01 da
 clients1=""    # deploys 1 client machine which run the specified number of client instances
 clients16="8"    # deploys 16 client machine which run the specified number of client instances
 clients32=""    # deploys 32 client machine which run the specified number of client instances
-systemSizes="8" # Must be sorted in ascending order!
+systemSizes="16" # Must be sorted in ascending order!
 failureCounts=(0) # For each system size, the corresponding failure count (on top of the correct nodes)
 fixBatchRate=true
 networkInterface="ens5"
 
-StragglerCnt=(1) # Count of Straggler (Only effect when crashTimings is 'Straggler')
+StragglerCnt=(5) # 0 1 2 3 4 5  change here !  Count of Straggler (Only effect when crashTimings is 'Straggler')
 privKeyNumEachPeer=(10) # Using as buffer for lagged instance
 UseSig=(false)
 tnCheckpointCnt=(3)
@@ -101,7 +101,7 @@ singleLeaderEpoch=$minEpochLength
 
 # Parameters to tune:
 batchsizes="4096"           # [requests]
-batchrates="32"             # [batches/s]
+batchrates="16"             # [batches/s]
 # minBatchTimeout=$(($systemSizes * 1000 / $batchrates))  # [ms]
 minBatchTimeout="125"       # [ms]
 maxBatchTimeout="16000"     # [ms]
@@ -122,12 +122,12 @@ function skip() {
 
 throughputsAuthPbft=$()
 # throughputsAuthPbft[4]="105000 110000 115000 120000"
-throughputsAuthPbft[4]="60000 70000 80000 90000 100000"
-throughputsAuthPbft[8]="60000 70000 80000"
-throughputsAuthPbft[16]="80000 90000"
-throughputsAuthPbft[32]="90000 100000 110000 120000"
-throughputsAuthPbft[64]="90000 100000 110000 120000"
-throughputsAuthPbft[128]=""
+throughputsAuthPbft[4]="30000 40000 50000 60000 70000"
+throughputsAuthPbft[8]="30000 40000 50000 60000 70000"
+throughputsAuthPbft[16]="30000 40000 50000 60000 70000"
+throughputsAuthPbft[32]="30000 40000 50000 60000 70000"
+throughputsAuthPbft[64]="30000 40000 50000 60000 70000"
+throughputsAuthPbft[128]="30000 40000 50000 60000 70000"
 throughputsNoAuthPbft=$()
 throughputsNoAuthPbft[4]="256"
 throughputsNoAuthPbft[8]="256"
