@@ -1,48 +1,33 @@
-# Deploying ISS
+# Deploying DQBFT
 
-This document first describes the scripts that facilitate a deployment on the IBM cloud.
+This document first describes the scripts that facilitate a deployment on the AWS cloud.
 
 Next, it describes how to run experiments:
-* on IBM cloud
+* on AWS cloud
 * locally
 
 Finally, it describes how to export plots from the experimental results.
 
-**All the following commands should be run with `mirbft/deployment` as working directory.**
-## IBM cloud setup
+**All the following commands should be run with `ladon/deployment` as working directory.**
+## AWS cloud setup
 
-Scripts to install and setup IBM Cloud CLI are under `scripts/setup` directory: 
+Scripts to install and setup AWS Cloud CLI can be found [here](https://docs.aws.amazon.com/streams/latest/dev/setup-awscli.html): 
 
-### Installation
-Run `./scripts/setup/install.sh` 
-
-Installs the required packages and the IBM Cloud CLI tools.<br/>
-Needs to be run only once on a machine.<br/>
-Only works with Ubuntu Linux.<br/>
-
-### Initialization
-
-Run `./scripts/setup/init.sh`
-Initializes the environment for the deployment scripts to be used by logging into to the IBM Cloud.<br/>
-Needs to be run once at the start of the session.<br/>
-The script expects an IBM Cloud API key file named `ibmcloud-api-key`.<br/>
-If such key does not exists, the script gives instructions on how to get and register one.<br/>
-The script also creates a public - private ssh key pair named `ibmcloud-ssh-key` and `ibmcloud-ssh-key.pub` which will be used for the remote deployment.
-The ssh public key should be uploaded to IBM cloud so that it is an authorized key for each generated virtual machine.
+Installs the AWS Cloud CLI tools and set up the AWS Cloud CLI's access key.<br/>
+Needs to be run only once on a machine (controller).<br/>
 
 
 ## Automated ISS Deployment
 In a nutshell, to run a set of experiments one has to perform 2 steps:
 1. Edit the configuration generation script to describe all desired experiments.
-2. Run the deployment script `deploy.sh` with the correct arguments
+2. Run the deployment script `deploy-clould-***.sh` with the correct arguments
 
-### deploy.sh
+## Deployment
 
-Script used to deploy and run experiments.<br/>
-Creates a new deployment directory under `deployment-data` containing the configuration for one or more experiments and runs the experiments on IBM cloud.<br/>
+Each experiment will create a new deployment directory under `deployment-data` containing the configuration for one or more experiments and runs the experiments on AWS cloud.<br/>
 In detail:
-* It sets up a new deployment of virtual machines on IBM cloud, or uses an existing IBM cloud deployment, or builds the source code locally (see details below).
-* For an IBM cloud deployment:
+* It sets up a new deployment of virtual machines on AWS cloud, or uses an existing AWS cloud deployment, or builds the source code locally (see details below).
+* For an AWS cloud deployment:
     * The deployment consists of a master machine and a set of peer (protocol nodes) and client machines.
     * The number, locations and system requirements of the virtual machines is defined in a configuration generation script which is provided as an argument.
 * It runs a set of experiments according to the configuration generation script.
@@ -51,21 +36,13 @@ In detail:
 * It compresses the raw logs and fetches to the local machine the compressed logs and the results of the performance analysis per experiment.
 * It summarized the results in a `summary.csv` file.
 
-The deployment directory is named after the deployment type: `cloud-xxxx` or `remote-xxxx`, where `xxxx` is a monotonically increasing deployment number automatically assigned to the deployment based on existing contents of the `deployment-data` directory.
+The deployment directory is named after the deployment type: `local-xxxx` or `remote-xxxx`, where `xxxx` is a monotonically increasing deployment number automatically assigned to the deployment based on existing contents of the `deployment-data` directory.
 
 Usage:
+### Local Deployment
+```./deploy.sh local deployment-type deployment-configurations [exp-id-offset]```
 
-`./deploy.sh [options] deployment-type deployment-configurations [exp-id-offset]`
-
-**options:**
-
-`-i`: Init only deployment. Only the the configuration for the experiments of this deployment will be generated.
-
-
-**deployment-type:**
-1. `cloud`: creates new cloud instances in IBM Cloud for master and slave and deploys, if not init only deployment, the experiments. 
-2. `remote path-to-cloud-instance-info`:  deploys the experiment configurations on existing IBM Cloud instances specified in a `cloud-instance-info` file. Such a file is generated for each new cloud deployment and can be found under the corresponding deployment directory (e.g., `deployment-data/cloud-0000/cloud-instance-info`)
-3. `local`: builds and runs the experiment locally
+This local deployment builds and runs the experiment locally.
 
 **deployment-configurations:**
 1. `new path-to-config-gen-script`: Creates a new set of experiment configurations based on the specified `config-gen-script` script. 
@@ -73,39 +50,49 @@ Usage:
 
 **exp-id-offset**: the offset from which the numbering of the executed experiments starts. If not defined the default value is `0`. 
 
+
+### AWS Cloud Deployment
+
+This AWS Cloud Deployment builds and runs the experiment in AWS Cloud Service.
+
+**WAN**: ```./deploy-cloud-WAN.sh [-i -r -k -d -sd]```
+
+**LAN**: ```./deploy-cloud-LAN.sh [-i -r -k -d -sd]```
+
+**options:**
+
+`-i`: This command retrieves the basic information from AWS cloud.
+
+- `-r`: This command launched new instances based on the configuration specified in generate-config.sh in AWS cloud.
+- `-k`: This command initializes new instances and updates the necessary key settings.
+
+`-d`: This command performs the experiment according to the configuraítions defined in generate-config.sh.
+
+`-sd`: This command terminates all the running instances in AWS cloud.
+
+
+
+### Deployment Example
+
 *Example 1*:  the command below starts a new cloud setup and runs the experiments described in `scripts/experiment-configuration/generate-config.sh` :
 ```
-./deploy.sh cloud new scripts/experiment-configuration/generate-config.sh
+./deploy-cloud-WAN.sh -i -r -k -d -sd
 ```
 
-*Example 2*:  the command below runs the experiments described in `scripts/experiment-configuration/generate-config.sh` on the remote deployment described in the file  `deployment-data/cloud-0000/cloud-instance-info`:
-```
-./deploy.sh -i remote deployment-data/cloud-0000/cloud-instance-info new scripts/experiment-configuration/generate-config.sh
-```
-
-*Example 3*:  the command below builds the source code locally and runs the experiments described in `scripts/experiment-configuration/generate-local-config.sh` :
+*Example 2*:  the command below builds the source code locally and runs the experiments described in `scripts/experiment-configuration/generate-local-config.sh` :
 ```
 ./deploy.sh local new scripts/experiment-configuration/generate-local-config.sh
 ```
 
-### Monitoring the IBM cloud deployment
-The `deploy.sh` script may seem to hang for a while. However running and analyzing all the experiment takes time.<br/>
+
+### Monitoring the AWS cloud deployment
+The cloud deployment may seem to hang for a while. However running and analyzing all the experiment takes time.<br/>
 Meanwhile, you can monitor their progress by looking into the master logs:
 
 Connect via ssh to the master machine (its IP can be found in `deployment-data/cloud-xxxx/cloud-instance-info` or `deployment-data/remote-xxxx/cloud-instance-info`).<br/>
 You can look at the logs of the commands the master is running in `master-log.log`.<br/>
 You can monitor the experiments that are being analyzed in `current-deployment-data/continuous-analysis.log`.
-
-
-### Cancelling the IBM cloud deployment
-After completing all the experiments, the remote machines can be easily cancelled by running:<br/>
-`scripts/cancel-cloud-intances.sh  tag`
-
-The `tag` here can take the following values:
-* `__all__`: Destroys **all** the virtual machines on IBM cloud. **Potentially also machines running other experiments!!!**.
-* `peer`: Destroys all machines with the tag *peer*.
-* `clients1, clients16, or clients32`: Destroys all client machines with the corresponding tag. Client tags are defined in the experiment configuration file.
-* ` path-to-cloud-instance-info`: Destroys all machines listed in the corresponding `cloud-instance-info` file.
+You can also fetch the more detailed log file from the working machine by command: `scripts/cloud-deploy/fetch_result_from_peer.sh`.
 
 ### Configuration generation script ###
 This script generates the configuration of all the experiments for a deployment. <br/>
@@ -144,7 +131,7 @@ is the directory for the experiment.
 
 ### Processing the results
 
-For each set of experiments, after it is completed, the result summary can be found under `deployment/deployment-data/cloud-xxxx/experiment-output/result-summary.csv` (replace with `remote-xxxx` for a remote deployment).<br/>
+For each set of experiments, after it is completed, the result summary can be found under `deployment/deployment-data/cloud-xxxx/experiment-output/result-summary.csv` (replace with `remote-xxxx` for a cloud deployment).<br/>
 For each individual experiment results are under `deployment/deployment-data/cloud-xxxx/experiment-output/yyyy`,
 where `yyyy` represents the experiment number.
 There are two types of calculate results.<br/>
