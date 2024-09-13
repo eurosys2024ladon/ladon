@@ -53,36 +53,107 @@ This local deployment builds and runs the experiment locally.
 
 ### AWS Cloud Deployment
 
-This AWS Cloud Deployment builds and runs the experiment in AWS Cloud Service.
+This AWS Cloud Deployment builds and runs the experiment in AWS Cloud Service. Related file is located in [cloud-deploy](deployment/scripts/cloud-deploy) folder.
 
-**WAN**: ```./deploy-cloud-WAN.sh [-i -r -k -d -sd]```
+#### Key Options and Their Functions:
 
-**LAN**: ```./deploy-cloud-LAN.sh [-i -r -k -d -sd]```
+- Initialize Instances `-i`: Deploys cloud instances across specified AWS regions based on calculated numbers of client and peer instances.
 
-**options:**
+- Set Regions `-r`: Specifies the AWS regions where instances should be deployed.
 
-`-i`: This command retrieves the basic information from AWS cloud.
+- Set SSH Keys `-k`: Configures SSH keys on the newly created instances to allow password-less root access via SSH.
 
-- `-r`: This command launched new instances based on the configuration specified in generate-config.sh in AWS cloud.
-- `-k`: This command initializes new instances and updates the necessary key settings.
+- Deploy Experiment `-d`: Placeholder for deploying experimental code or applications to the instances (implementation not detailed in the script).
 
-`-d`: This command performs the experiment according to the configuraítions defined in generate-config.sh.
+- Shut Down Instances `-sd`: Terminates all running instances after the experiment or tasks are completed.
 
-`-sd`: This command terminates all the running instances in AWS cloud.
+- Stop Instances `-st`: Stops all running instances without terminating them, allowing them to be restarted later.
 
+#### Main Components of the Script:
+
+1. SSH Options Definition: Sets SSH parameters for secure connections to cloud instances, including the private key file and options to suppress host key checking.
+
+2. Instance Number Retrieval:
+    - Uses a Python script (find_insnum.py) to determine the number of client and peer instances required.
+    - Parses the output to extract total instance counts.
+
+3. Region and Launch Template Configuration:
+
+    - Lists AWS regions (region_list) and corresponding launch template IDs (LaunchTemplateId_list) used for deploying instances. (Need to modify your specific template here)
+    - Calculates the number of instances to deploy in each region based on the total number needed.
+
+4. Instance Initialization (-i option):
+
+    - Deploys instances in each specified region using AWS CLI commands.
+    - Tags instances with the name "Parallel-bft-instance" for easy identification.
+    - Waits for instances to initialize (sleeps for 60 seconds).
+    - Collects public and private IP addresses of all instances.
+5. Writing Instance Information:
+
+    - Uses another Python script (write_cloud_instance.py) to write the IP addresses of the instances for further use.
+6. SSH Key Setup (-k option):
+
+    - Copies a custom SSH configuration file (sshd_config) to each instance to allow root login.
+    - Copies the SSH private and public keys to the root user's .ssh directory on each instance.
+    - Sets appropriate permissions on the SSH key files.
+    - Copies and executes a monitoring script (monitor.sh) on each instance to set up monitoring tasks.
+7. Instance Shutdown (-sd option):
+
+    - Terminates all running instances across the specified regions using AWS CLI commands.
+8. Instance Stop (-st option):
+
+    - Stops all running instances without terminating them, which can save costs while retaining the instance configurations.
+
+#### Usage Flow:
+``` Shell
+./scripts/cloud-deploy/deploy-cloud-WAN.sh [-i -r -k -d -sd]
+
+./scripts/cloud-deploy/deploy-cloud-LAN.sh [-i -r -k -d -sd]
+```
+
+##### Initialization:
+
+- Run the script with `-i` to initialize and deploy instances.
+- Optionally use `-r` to specify regions and `-k` to set up SSH keys immediately after initialization.
+
+##### Deploy Experiment:
+
+- Use `-d` to deploy experiments or applications to the instances (actual deployment steps need to be implemented).
+
+##### Shutdown or Stop Instances:
+
+- Use `-sd` to terminate instances after completion.
+- Use `-st` to stop instances without terminating them.
 
 
 ### Deployment Example
 
-*Example 1*:  the command below starts a new cloud setup and runs the experiments described in `scripts/experiment-configuration/generate-config.sh` :
-```
-./deploy-cloud-WAN.sh -i -r -k -d -sd
+**Example 1**:  the command below starts a new cloud setup and runs the experiments described in `scripts/experiment-configuration/generate-config.sh` :
+```Shell
+./scripts/cloud-deploy/deploy-cloud-WAN.sh -i -r -k -d -sd
 ```
 
-*Example 2*:  the command below builds the source code locally and runs the experiments described in `scripts/experiment-configuration/generate-local-config.sh` :
-```
-./deploy.sh local new scripts/experiment-configuration/generate-local-config.sh
-```
+**Example 2**:  the command below builds the source code locally and runs the experiments described in `scripts/experiment-configuration/generate-local-config.sh` :
+
+    ```Shell
+    ./scripts/cloud-deploy/deploy-cloud-WAN.sh -i -r -k -d
+    
+    # After each experiment, you can check the whole log at: deployment/deployment-data/remote-XXXX/
+   
+    # Change the configure file: deployment/scripts/experiment-configuration/generate-config.sh 
+
+    # Run the next experiment without relaunching instances
+    ./scripts/cloud-deploy/deploy-cloud-WAN.sh -d 
+    
+    # Many experiments ...
+
+    # Fetch the running log of the experiment by:
+    ./scripts/cloud-deploy/fetch_result_from_peer.sh
+
+    # Shutdown all instances after all experiments
+    ./scripts/cloud-deploy/deploy-cloud-WAN.sh -sd 
+    ```
+
 
 
 ### Monitoring the AWS cloud deployment
@@ -92,6 +163,7 @@ Meanwhile, you can monitor their progress by looking into the master logs:
 Connect via ssh to the master machine (its IP can be found in `deployment-data/cloud-xxxx/cloud-instance-info` or `deployment-data/remote-xxxx/cloud-instance-info`).<br/>
 You can look at the logs of the commands the master is running in `master-log.log`.<br/>
 You can monitor the experiments that are being analyzed in `current-deployment-data/continuous-analysis.log`.
+
 You can also fetch the more detailed log file from the working machine by command: `scripts/cloud-deploy/fetch_result_from_peer.sh`.
 
 ### Configuration generation script ###

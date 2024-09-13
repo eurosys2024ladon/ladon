@@ -208,6 +208,8 @@ func (pi *pbftInstance) init(seg manager.Segment, orderer *PbftOrderer) {
 		pi.htnLog[int32(i)] = ((pi.segment.FirstSN() - int32(pi.segment.SegID()%membership.NumNodes())) / int32(membership.NumNodes())) - 1
 	}
 	lock.Unlock()
+	
+	// Initialize the serilized proposing utility
 	pi.readyToPropose = make(chan struct{})
 	pi.alreadyCommit = make(map[int32]chan struct{})
 	pi.waitForPreviousBlock = make(map[int32]map[int32]struct{})
@@ -217,6 +219,8 @@ func (pi *pbftInstance) init(seg manager.Segment, orderer *PbftOrderer) {
 	for i := 0; i < membership.NumNodes(); i++ {
 		pi.firstUncommitSn[int32(i)] = int32(i) + seg.FirstSN() - int32(seg.SegID()%membership.NumNodes())
 	}
+
+	// Initialize inLadonViewChange valuable
 	pi.inLadonViewChange = false
 	// Ladon
 }
@@ -338,20 +342,20 @@ func (pi *pbftInstance) lead() {
 
 		//Ladon
 
+		// Simulate the ByzantineStraggler, always choose the smaller 2f+1 set of rank.
 		if membership.SimulatedStraggler[membership.OwnID] == 1 && (config.Config.CrashTiming == "ByzantineStraggler") && len(newSeqMsg.Tnlog) > membership.Quorum() {
 			// drop some high ranks(tn)
-			//sort.Ints(newSeqMsg.Tnlog)
-			//logger.Info().Msg("drop some high ranks")
+			// logger.Trace().Msg("drop some high ranks")
 			sort.Slice(newSeqMsg.Tnlog, func(i, j int) bool { return newSeqMsg.Tnlog[i] < newSeqMsg.Tnlog[j] })
 			newSeqMsg.Tnlog = newSeqMsg.Tnlog[:membership.Quorum()]
-			//for key, value := range newSeqMsg.Tnlog {
-			//	logger.Info().Int("key", key).Int32("value", value).Msg("tnlog cutted")
-			//	}
+			// for key, value := range newSeqMsg.Tnlog {
+			//	 logger.Debug().Int("key", key).Int32("value", value).Msg("tnlog cutted")
+			// }
 		}
 
 		htnToPropose := newSeqMsg.Tnlog[0]
 		for _, value := range newSeqMsg.Tnlog {
-			//logger.Info().Int32("tn", value).Msg("tn in rankset")
+			//logger.Debug().Int32("tn", value).Msg("tn in rankset")
 			if value > htnToPropose {
 				htnToPropose = value
 			}
@@ -360,6 +364,7 @@ func (pi *pbftInstance) lead() {
 
 		//logger.Info().Int32("htnToPropose", htnToPropose).Int32("GetHtn", membership.GetHtn()).Msg("compare")
 
+		// Update the local known highest tn rank
 		newSeqMsg.Tn = htnToPropose
 		membership.SetHtn(htnToPropose)
 		snFromHtnToPropose := htnToPropose*int32(membership.NumNodes()) + int32(pi.segment.SegID()%membership.NumNodes())
@@ -372,30 +377,33 @@ func (pi *pbftInstance) lead() {
 
 		// Situation 1: current sn == htnToPropose
 		if sn == snFromHtnToPropose {
+			// No further action
 
+		// Situation 2: snFromHtnToPropose > current sn, 
+		// need to perform dynamic ordering - skip some sn until snFromHtnToPropose
 		} else if sn < snFromHtnToPropose && snFromHtnToPropose < pi.segment.LastSN() {
 			msg.Sn = snFromHtnToPropose
 			newSeqMsg.Sn = snFromHtnToPropose
+	
+		// Situation 3: snFromHtnToPropose > LastSN, 
+		// need to perform dynamic ordering - skip some sn until LastSN
 		} else if snFromHtnToPropose >= pi.segment.LastSN() {
 			// When epoch finished, propose the last sn
 			msg.Sn = pi.segment.LastSN()
 			newSeqMsg.Sn = pi.segment.LastSN()
+		
+		// Situation 4: snFromHtnToPropose < current sn,
+		// error occurs, snFromHtnToPropose should not smaller than current sn
 		} else {
 			logger.Error().
 				Int32("sn", sn).
 				Int32("snFromHtnToPropose", snFromHtnToPropose).
 				Int32("htnToPropose", htnToPropose).
-				Msg("Error occur !")
+				Msg("snFromHtnToPropose < current sn, error occur ! ")
 		}
 
 		// Update related information for next proposal
 		pi.lastProposeSn = msg.Sn
-		// lock.Lock()
-		// for key, _ := range pi.htnLog {
-		// 	pi.htnLog[key] = -1
-		// }
-		// lock.Unlock()
-
 		// Ladon
 
 		pi.serializer.serialize(msg)
@@ -434,7 +442,6 @@ func (pi *pbftInstance) proposeSN(preprepare *pb.PbftPreprepare, sn int32) {
 	// Simulate a straggler.
 	batchSize := pi.segment.BatchSize()
 	if membership.SimulatedCrashes[membership.OwnID] != nil && (config.Config.CrashTiming == "Straggler" || config.Config.CrashTiming == "ByzantineStraggler") {
-		// we cut an empty batch to maximize damage
 		batchSize = 4096
 	}
 
@@ -461,11 +468,13 @@ func (pi *pbftInstance) proposeSN(preprepare *pb.PbftPreprepare, sn int32) {
 		Int32("senderID", membership.OwnID).
 		Int("nReq", len(preprepare.Batch.Requests)).
 		Msg("Sending PREPREPARE.")
+	
 	//Ladon
 	//for key, value := range preprepare.Tnlog {
-	//	logger.Info().Int("key", key).Int32("value", value).Msg("tnlog in preprepare")
+	//	logger.Debug().Int("key", key).Int32("value", value).Msg("tnlog in preprepare")
 	//}
 	//Ladon
+
 	// Add message to own log
 	digest := pbftDigest(preprepare)
 	pi.batches[pi.view][sn].digest = digest
@@ -497,7 +506,6 @@ func (pi *pbftInstance) proposeSN(preprepare *pb.PbftPreprepare, sn int32) {
 }
 
 func (pi *pbftInstance) handlePreprepare(preprepare *pb.PbftPreprepare, msg *pb.ProtocolMessage) error {
-	// start := time.Now()
 
 	// Convenience variables
 	sn := msg.Sn
@@ -536,12 +544,6 @@ func (pi *pbftInstance) handlePreprepare(preprepare *pb.PbftPreprepare, msg *pb.
 		return fmt.Errorf("instance %d does not handle sequence number %d", pi.segment.SegID(), preprepare.Sn)
 	}
 
-	// logger.Info().
-	// 	Int32("sn", sn).
-	// 	Int64("costTime", time.Since(start).Milliseconds()).
-	// 	Msg("handlepreprepare 0")
-	// start = time.Now()
-
 	batch := pi.batches[pi.view][sn]
 	// Check whether the batch has been already committed (this can be the case due to state transfer)
 	if batch.committed {
@@ -554,20 +556,8 @@ func (pi *pbftInstance) handlePreprepare(preprepare *pb.PbftPreprepare, msg *pb.
 		return fmt.Errorf("duplicate preprepare from %d for sn %d", senderID, sn)
 	}
 
-	// logger.Info().
-	// 	Int32("sn", sn).
-	// 	Int64("costTime", time.Since(start).Milliseconds()).
-	// 	Msg("handlepreprepare 1")
-	// start = time.Now()
-
 	// Check that proposal requests are valid
 	batch.batch = request.NewBatch(preprepare.Batch)
-
-	// logger.Info().
-	// 	Int32("sn", sn).
-	// 	Int64("costTime", time.Since(start).Milliseconds()).
-	// 	Msg("handlepreprepare 2")
-	// start = time.Now()
 
 	if batch.batch == nil {
 		logger.Error().Int32("peerId", senderID).Int32("sn", sn).Msg("Invalid requests in proposal.")
@@ -585,31 +575,13 @@ func (pi *pbftInstance) handlePreprepare(preprepare *pb.PbftPreprepare, msg *pb.
 	// Mark requests as preprepared
 	batch.batch.MarkInFlight()
 
-	// logger.Info().
-	// 	Int32("sn", sn).
-	// 	Int64("costTime", time.Since(start).Milliseconds()).
-	// 	Msg("handlepreprepare 3")
-	// start = time.Now()
-
 	// Create new batch
 	digest := pbftDigest(preprepare)
 	batch.digest = digest
 	batch.preprepareMsg = preprepare
 	batch.preprepared = true
 
-	// logger.Info().
-	// 	Int32("sn", sn).
-	// 	Int64("costTime", time.Since(start).Milliseconds()).
-	// 	Msg("handlepreprepare 4")
-	// start = time.Now()
-
 	pi.sendPrepare(batch)
-
-	// logger.Info().
-	// 	Int32("sn", sn).
-	// 	Int64("costTime", time.Since(start).Milliseconds()).
-	// 	Msg("handlepreprepare 5")
-	// start = time.Now()
 
 	if !batch.prepared && isPrepared(batch) {
 		batch.prepared = true
@@ -618,12 +590,6 @@ func (pi *pbftInstance) handlePreprepare(preprepare *pb.PbftPreprepare, msg *pb.
 		// Ladon
 		pi.sendCommit(batch)
 	}
-
-	// logger.Info().
-	// 	Int32("sn", sn).
-	// 	Int64("costTime", time.Since(start).Milliseconds()).
-	// 	Msg("handlepreprepare 6")
-	// start = time.Now()
 
 	if !batch.committed && batch.CheckCommits() {
 
@@ -634,17 +600,9 @@ func (pi *pbftInstance) handlePreprepare(preprepare *pb.PbftPreprepare, msg *pb.
 		//	logger.Warn().Int32("sn", sn).Int("segID", pi.segment.SegID()).Int32("ownID", membership.OwnID).Msg("DEBUG: not committing!")
 		//	return nil
 		//}
-		// logger.Info().
-		// 	Int32("sn", sn).
-		// 	Int64("costTime", time.Since(start).Milliseconds()).
-		// 	Msg("handlepreprepare 7")
+
 		pi.announce(batch, sn, preprepare.Batch, preprepare.Aborted, preprepare.Ts, batch.lastCommitTs)
 	}
-
-	// logger.Info().
-	// 	Int32("sn", sn).
-	// 	Int64("costTime", time.Since(start).Milliseconds()).
-	// 	Msg("handlepreprepare 8")
 
 	return nil
 }
@@ -718,14 +676,7 @@ func (pi *pbftInstance) handlePrepare(prepare *pb.PbftPrepare, msg *pb.ProtocolM
 	if _, ok := batch.prepareMsgs[senderID]; ok {
 		return fmt.Errorf("duplicate prepare message from %d", senderID)
 	}
-	// if batch.prepareMsgs == nil {
-	// 	logger.Info().Int32("sn", msg.Sn).Msg("batch.prepareMsgs == nil, rehandle it.")
-	// 	go func() {
-	// 		time.Sleep(200 * time.Millisecond)
-	// 		pi.handlePrepare(prepare, msg)
-	// 	}()
-	// 	return nil
-	// }
+
 	batch.prepareMsgs[senderID] = prepare
 
 	if !batch.prepared && isPrepared(batch) {
@@ -1003,10 +954,6 @@ func (pi *pbftInstance) announce(batch *pbftBatch, sn int32, reqBatch *pb.Batch,
 	}
 	lock.Unlock()
 
-	// logger.Info().
-	// 	Int32("sn", sn).
-	// 	Msg("announce 1")
-
 	// Ladon
 	// Only the batch has preprepareMsg can do Ladon
 	if batch.preprepareMsg != nil && !pi.inLadonViewChange {
@@ -1030,21 +977,10 @@ func (pi *pbftInstance) announce(batch *pbftBatch, sn int32, reqBatch *pb.Batch,
 				lock.Unlock()
 
 				// Wait for previous block commit
-				// logger.Info().
-				// Int32("i", i).
-				// Int32("sn", sn).
-				// Msg("Check if previous block is a valid block")
-
-				logger.Info().
-					Int32("i", i).
-					Int32("sn", sn).
-					Msg("announce 11")
-
-				// go func() {
-				// 	logger.Info().
+				// logger.Debug().
 				// 		Int32("i", i).
 				// 		Int32("sn", sn).
-				// 		Msg("announce 11")
+				// 		Msg("Check if previous block is a valid block")
 
 				// 	<-commitChan
 
@@ -1057,10 +993,6 @@ func (pi *pbftInstance) announce(batch *pbftBatch, sn int32, reqBatch *pb.Batch,
 				return
 			}
 		}
-
-		// logger.Info().
-		// 	Int32("sn", sn).
-		// 	Msg("announce 2")
 
 		// Ladon: Commit the empty block
 		for i := firstUncommitSn; i < sn; i += int32(membership.NumNodes()) {
@@ -1085,9 +1017,6 @@ func (pi *pbftInstance) announce(batch *pbftBatch, sn int32, reqBatch *pb.Batch,
 	}
 	// Ladon
 
-	// logger.Info().
-	// 	Int32("sn", sn).
-	// 	Msg("announce 3")
 
 	// Mark batch as committed.
 	batch.committed = true
@@ -1110,10 +1039,6 @@ func (pi *pbftInstance) announce(batch *pbftBatch, sn int32, reqBatch *pb.Batch,
 	// Announce decision.
 	announcer.Announce(logEntry)
 
-	// logger.Info().
-	// 	Int32("sn", sn).
-	// 	Msg("announce 4")
-
 	// Ladon
 	if batch.preprepareMsg != nil && !pi.inLadonViewChange {
 		lock.Lock()
@@ -1125,6 +1050,7 @@ func (pi *pbftInstance) announce(batch *pbftBatch, sn int32, reqBatch *pb.Batch,
 		}
 		lock.Unlock()
 		if len(commitList) > 0 {
+			// Sort the waitForPreviousBlock, and recommit them in sequence.
 			sort.Slice(commitList, func(i, j int) bool {
 				return commitList[i] < commitList[j]
 			})
@@ -1132,12 +1058,8 @@ func (pi *pbftInstance) announce(batch *pbftBatch, sn int32, reqBatch *pb.Batch,
 				if _, ok := pi.batches[pi.view][value]; !ok {
 					logger.Error().Msgf("instance %d does not handle sequence numer %d", pi.segment.SegID(), value)
 				}
-				// logger.Info().
-				// 	Int32("value", value).
-				// 	Int32("sn", sn).
-				// 	Msg("announce 41")
-
 				batch := pi.batches[pi.view][value]
+
 				pi.announce(batch, value, batch.preprepareMsg.Batch, batch.preprepareMsg.Aborted, batch.preprepareMsg.Ts, batch.lastCommitTs)
 			}
 		}
