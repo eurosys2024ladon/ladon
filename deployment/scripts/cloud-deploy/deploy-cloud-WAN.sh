@@ -156,7 +156,8 @@ if [ "$1" = "-sd" ]; then
         $(aws ec2 describe-instances \
         --filters "Name=tag:Name,Values=Parallel-bft-instance" "Name=instance-state-name,Values=running" \
         --query "Reservations[].Instances[].InstanceId" \
-        --output text)
+        --output text) \
+        --no-cli-pager
     done
 fi
 
@@ -170,6 +171,7 @@ if [ "$1" = "-st" ]; then
         $(aws ec2 describe-instances \
         --filters "Name=tag:Name,Values=Parallel-bft-instance" "Name=instance-state-name,Values=running" \
         --query "Reservations[].Instances[].InstanceId" \
-        --output text)
+        --output text) \
+        --no-cli-pager
     done
 fi

@@ -129,11 +129,11 @@ fi
 # If shutdown flag (-sd) is passed, terminate instances
 if [ "$1" = "-sd" ]; then
     shift
-    aws ec2 terminate-instances --instance-ids $(aws ec2 describe-instances --query "Reservations[].Instances[].InstanceId" --output text)
+    aws ec2 terminate-instances --instance-ids $(aws ec2 describe-instances --query "Reservations[].Instances[].InstanceId" --output text) --no-cli-pager
 fi
 
 # If stop flag (-st) is passed, stop instances
 if [ "$1" = "-st" ]; then
     shift
-    aws ec2 stop-instances --instance-ids $(aws ec2 describe-instances --query "Reservations[].Instances[].InstanceId" --output text)
+    aws ec2 stop-instances --instance-ids $(aws ec2 describe-instances --query "Reservations[].Instances[].InstanceId" --output text) --no-cli-pager
 fi
